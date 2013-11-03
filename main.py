@@ -7,13 +7,31 @@ import lxml.etree
 import urlparse
 import codecs
 import datetime
-
+import unidecode
 import bs4
+import urllib
 
 DEBUG = 0
+
+"""The headers to write for each post."""
 HEADERS = ["categories: blog", "layout: post"]
 
+def encode_title(title):
+    """Jekyll posts are stored as individual files.
+    It makes sense to name each file with the title of the post.
+    However, Jekyll doesn't seem to handle file names with spaces or non-latin characters.
+    It picks them up when building the site, but the actual links will be broken.
+    This function encodes the title in such a way that it can be used as a filename for Jekyll posts."""
+    #
+    # You probably don't need to do this if your posts are in English
+    #
+    latin_title = unidecode.unidecode(self.title)
+    encoded_title = urllib.quote_plus(latin_title)
+    return encoded_title
+
 class Entry:
+    """Represents a single LiveJournal entry.
+    Includes functions for downloading an entry from a known URL."""
     def __init__(self, title, text, updated, prev_entry_url):
         self.title = title
         self.text = text
@@ -21,7 +39,11 @@ class Entry:
         self.prev_entry_url = prev_entry_url
 
     def save_to(self, destination_dir):
-        opath = P.join(destination_dir, "%s %s.html" % (self.updated.strftime("%Y-%m-%d"), self.title))
+        """Save the entry to the specified directory.
+        The filename of the entry will be determined from its title and update time.
+        The entry will contain a Jekyll header with a HTML fragment representing the content."""
+        title = encode_title(self.title)
+        opath = P.join(destination_dir, "%s-%s.html" % (self.updated.strftime("%Y-%m-%d"), title))
         pretty_text = bs4.BeautifulSoup(self.text).prettify()
         lines = ["---", "title: %s" % self.title] + HEADERS + ["---", pretty_text]
         with codecs.open(opath, "w", "utf-8") as fout:
@@ -31,7 +53,6 @@ class Entry:
     def download(url):
         """Download an entry from a URL and parse it."""
         r = requests.get(url)
-
         assert r.status_code == 200
 
         root = lxml.html.document_fromstring(r.text)
@@ -42,15 +63,14 @@ class Entry:
             prev_entry_url = links[0].getparent().get("href")
         if DEBUG:
             print prev_entry_url
-        #assert prev_entry_url
 
         updated = None
         abbr = root.xpath("//abbr[@class='updated']")
         if abbr:
-            # TODO: parse into datetime
             timestamp_str = abbr[0].get("title")
             # 2013-10-08T11:41:00+03:00
             # get rid of the UTC offset, since we can't parse it :(
+            # we don't use it anywhere, anyway.
             timestamp = datetime.datetime.strptime(timestamp_str[:-6], "%Y-%m-%dT%H:%M:%S")
             
         if DEBUG:
@@ -65,6 +85,10 @@ class Entry:
             print title
         assert title
 
+        #
+        # Here we only grab the HTML fragment that corresponds to the entry context.
+        # Throw everything else away.
+        #
         entry_text = None
         dd = root.xpath("//div[@class='entry-content']")
         if dd:
@@ -82,14 +106,6 @@ def create_parser():
     p.add_option("-d", "--debug", dest="debug", type="int", default="0", help="Set debugging level")
     p.add_option("", "--destination", dest="destination", type="string", default="html", help="Set destination directory")
     return p
-
-def process_url(url, destination):
-    """Download and save the specified URL.
-    Returns the URL to the previous entry."""
-    up = urlparse.urlparse(destination)
-    _, fname = P.split(up.path)
-
-    dest_path = P.join(destination, fname)
 
 def main():
     global DEBUG
