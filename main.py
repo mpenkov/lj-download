@@ -23,10 +23,10 @@ def encode_title(title):
     It picks them up when building the site, but the actual links will be broken.
     This function encodes the title in such a way that it can be used as a filename for Jekyll posts."""
     #
-    # You probably don't need to do this if your posts are in English
+    # You probably don't need the line below if your posts are in English
     #
-    latin_title = unidecode.unidecode(self.title)
-    encoded_title = urllib.quote_plus(latin_title)
+    latin_title = unidecode.unidecode(title)
+    encoded_title = urllib.quote_plus(latin_title.replace(" ", "-"))
     return encoded_title
 
 class Entry:
@@ -44,6 +44,9 @@ class Entry:
         The entry will contain a Jekyll header with a HTML fragment representing the content."""
         title = encode_title(self.title)
         opath = P.join(destination_dir, "%s-%s.html" % (self.updated.strftime("%Y-%m-%d"), title))
+        #
+        # self.text is currently a UTF-8 encoded string, but prettify turns it into a Unicode string.
+        #
         pretty_text = bs4.BeautifulSoup(self.text).prettify()
         lines = ["---", "title: %s" % self.title] + HEADERS + ["---", pretty_text]
         with codecs.open(opath, "w", "utf-8") as fout:
