@@ -152,13 +152,11 @@ def main():
     if not P.isdir(options.destination):
         os.mkdir(options.destination)
 
-    while True:
+    while next_url is not None:
         print next_url
         entry = Entry.download(next_url)
         entry.save_to(options.destination)
         next_url = entry.prev_entry_url
-        if next_url is None:
-            break
 
 if __name__ == "__main__":
     main()
