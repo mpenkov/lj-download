@@ -93,7 +93,7 @@ class Entry:
         self.updated = updated
         self.prev_entry_url = prev_entry_url
 
-    def save_to(self, destination_dir):
+    def save_to(self, destination_dir, overwrite=False):
         """Save the entry to the specified directory.
         The filename of the entry will be determined from its title and update time.
         The entry will contain a Jekyll header with a HTML fragment representing the content."""
@@ -104,6 +104,12 @@ class Entry:
         #
         pretty_text = bs4.BeautifulSoup(self.text).prettify()
         lines = ["---", "title: %s" % self.title] + HEADERS + ["---", pretty_text]
+        #
+        # TODO:
+        # If the filenames aren't unique enough (e.g. same date, same title), the entries may end up overwriting each other.
+        #
+        if not overwrite:
+            assert not P.isfile(opath)
         with codecs.open(opath, "w", "utf-8") as fout:
             fout.write("\n".join(lines))
 
@@ -126,6 +132,7 @@ def create_parser():
     p = OptionParser("usage: %prog http://yourusername.livejournal.com/most-recent-entry.html")
     p.add_option("-d", "--debug", dest="debug", type="int", default="0", help="Set debugging level")
     p.add_option("", "--destination", dest="destination", type="string", default="html", help="Set destination directory")
+    p.add_option("-f", "--force-overwrite", dest="overwrite", action="store_true", default=False, help="Overwrite existing files")
     return p
 
 def main():
