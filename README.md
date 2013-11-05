@@ -14,6 +14,8 @@ Pre-requisites
 * bs4 - for pretty-printing the HTML (I couldn't get lxml to do this for me)
 * unidecode - for transliteration of the title (you don't need this if your blog is in English)
 
+You can download all of the above packages from [https://pypi.python.org/pypi](PyPi).
+
 Running
 -------
 
