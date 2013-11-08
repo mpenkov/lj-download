@@ -84,14 +84,27 @@ def parse_entry_text(root):
     assert entry_text
     return entry_text
 
+def parse_and_remove_tags(root):
+    """Returns the tags for a LiveJournalEntry.
+    As a side effect, destroy the tags element of the entry."""
+    tags = []
+    a = root.xpath("//div[@class='ljtags']/a[@rel='tag']")
+    if a:
+        tags = [aa.text for aa in a]
+    ljtags = root.xpath("//div[@class='ljtags']")
+    if ljtags:
+        ljtags[0].getparent().remove(ljtags[0])
+    return tags
+
 class Entry:
     """Represents a single LiveJournal entry.
     Includes functions for downloading an entry from a known URL."""
-    def __init__(self, title, text, updated, prev_entry_url):
+    def __init__(self, title, text, updated, prev_entry_url, tags):
         self.title = title
         self.text = text
         self.updated = updated
         self.prev_entry_url = prev_entry_url
+        self.tags = tags
 
     def save_to(self, destination_dir, overwrite=False):
         """Save the entry to the specified directory.
@@ -103,7 +116,7 @@ class Entry:
         # self.text is currently a UTF-8 encoded string, but prettify turns it into a Unicode string.
         #
         pretty_text = bs4.BeautifulSoup(self.text).prettify()
-        lines = ["---", "title: %s" % self.title] + HEADERS + ["---", pretty_text]
+        lines = ["---", "title: %s" % self.title] + HEADERS + ["tags: " + " ".join(self.tags), "---", pretty_text]
         #
         # TODO:
         # If the filenames aren't unique enough (e.g. same date, same title), the entries may end up overwriting each other.
@@ -121,11 +134,12 @@ class Entry:
 
         root = lxml.html.document_fromstring(r.text)
         title = parse_title(root)
+        tags = parse_and_remove_tags(root)
         entry_text = parse_entry_text(root)
         timestamp = parse_timestamp(root)
         prev_entry_url = parse_previous_link(root)
 
-        return Entry(title, entry_text, timestamp, prev_entry_url)
+        return Entry(title, entry_text, timestamp, prev_entry_url, tags)
 
 def create_parser():
     from optparse import OptionParser
@@ -155,7 +169,7 @@ def main():
     while next_url is not None:
         print next_url
         entry = Entry.download(next_url)
-        entry.save_to(options.destination)
+        entry.save_to(options.destination, overwrite=options.overwrite)
         next_url = entry.prev_entry_url
 
 if __name__ == "__main__":
