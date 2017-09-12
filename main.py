@@ -32,9 +32,9 @@ def encode_title(title):
 def parse_previous_link(root):
     """Parse the link to the chronologically previous blog entry."""
     prev_entry_url = None
-    links = root.xpath("//span[@class='entry-linkbar-inner']/a/img[@alt='Previous Entry']")
+    links = root.xpath("//a[contains(@class,'b-controls-prev')]")
     if links:
-        prev_entry_url = links[0].getparent().get("href")
+        prev_entry_url = links[0].get("href")
     if DEBUG:
         print prev_entry_url
     return prev_entry_url
@@ -42,9 +42,9 @@ def parse_previous_link(root):
 def parse_title(root):
     """Parse the title of a LiveJournal entry."""
     title = None
-    dt = root.xpath("//dt[@class='entry-title']")
+    dt = root.xpath("./head/meta[@property='og:title']/@content")
     if dt:
-        title = dt[0].text
+        title = dt[0]
     if DEBUG:
         print title
     assert title
@@ -53,15 +53,14 @@ def parse_title(root):
 def parse_timestamp(root):
     """Parse the timestamp of a LiveJournal entry.
     Returns a datetime.datetime instance."""
-    updated = None
-    abbr = root.xpath("//abbr[@class='updated']")
-    if abbr:
-        timestamp_str = abbr[0].get("title")
-        # 2013-10-08T11:41:00+03:00
-        # get rid of the UTC offset, since we can't parse it :(
-        # we don't use it anywhere, anyway.
-        timestamp = datetime.datetime.strptime(timestamp_str[:-6], "%Y-%m-%dT%H:%M:%S")
-
+    published = root.xpath("//time[contains(@class,'published')]")
+    if published:
+        published_0 = published[0]
+        t_year = int(published_0.xpath("./a")[0].text)
+        t_month = int(published_0.xpath("./a")[1].text)
+        t_day = int(published_0.xpath("./a")[2].text)
+        #TODO: parse time
+        timestamp = datetime.datetime(t_year, t_month, t_day)        
     if DEBUG:
         print timestamp
     assert timestamp
@@ -75,25 +74,22 @@ def parse_entry_text(root):
     # Throw everything else away.
     #
     entry_text = None
-    dd = root.xpath("//div[@class='entry-content']")
+    dd = root.xpath("//div[@class='b-singlepost-bodywrapper']")
     if dd:
         entry_text = lxml.etree.tostring(dd[0], pretty_print=True, encoding="utf-8")
-
     if DEBUG:
         print entry_text
     assert entry_text
     return entry_text
 
-def parse_and_remove_tags(root):
-    """Returns the tags for a LiveJournalEntry.
-    As a side effect, destroy the tags element of the entry."""
+def parse_tags(root):
+    """Returns the tags for a LiveJournalEntry."""
     tags = []
-    a = root.xpath("//div[@class='ljtags']/a[@rel='tag']")
+    a = root.xpath("./head/meta[@property='article:tag']/@content")
     if a:
-        tags = [aa.text for aa in a]
-    ljtags = root.xpath("//div[@class='ljtags']")
-    if ljtags:
-        ljtags[0].getparent().remove(ljtags[0])
+        tags = [aa for aa in a]
+    if DEBUG:
+        print tags
     return tags
 
 class Entry:
@@ -115,7 +111,7 @@ class Entry:
         #
         # self.text is currently a UTF-8 encoded string, but prettify turns it into a Unicode string.
         #
-        pretty_text = bs4.BeautifulSoup(self.text).prettify()
+        pretty_text = bs4.BeautifulSoup(self.text, "lxml").prettify()
         lines = ["---", "title: %s" % self.title] + HEADERS + ["tags: " + " ".join(self.tags), "---", pretty_text]
         #
         # TODO:
@@ -134,7 +130,7 @@ class Entry:
 
         root = lxml.html.document_fromstring(r.text)
         title = parse_title(root)
-        tags = parse_and_remove_tags(root)
+        tags = parse_tags(root)
         entry_text = parse_entry_text(root)
         timestamp = parse_timestamp(root)
         prev_entry_url = parse_previous_link(root)
